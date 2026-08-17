@@ -93,7 +93,7 @@
   }
 
   async function listChildren(folderId) {
-    const cacheKey = "hq_cache_" + folderId;
+    const cacheKey = "hq_cache_v2_" + folderId;
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
       try {
@@ -109,6 +109,9 @@
         fields: "nextPageToken, files(id, name, mimeType, imageMediaMetadata(width,height))",
         orderBy: "folder,name_natural",
         pageSize: "1000",
+        supportsAllDrives: "true",
+        includeItemsFromAllDrives: "true",
+        corpora: "allDrives",
         key: state.apiKey
       });
       if (pageToken) params.set("pageToken", pageToken);
@@ -214,7 +217,7 @@
 
   async function loadFolderCover(cardEl) {
     const folderId = cardEl.dataset.folderId;
-    const cacheKey = "hq_cover_" + folderId;
+    const cacheKey = "hq_cover_v2_" + folderId;
     let coverId = sessionStorage.getItem(cacheKey);
     if (coverId === "none") return;
     if (!coverId) {
@@ -343,7 +346,7 @@
       openFolderAsReader(last.folderId, last.path);
     };
     // thumb: tenta usar a capa em cache
-    const cacheKey = "hq_cover_" + last.folderId;
+    const cacheKey = "hq_cover_v2_" + last.folderId;
     const coverId = sessionStorage.getItem(cacheKey);
     const img = el.querySelector(".cr-thumb img");
     if (coverId && coverId !== "none") {
