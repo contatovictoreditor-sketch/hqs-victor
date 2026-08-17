@@ -111,7 +111,6 @@
         pageSize: "1000",
         supportsAllDrives: "true",
         includeItemsFromAllDrives: "true",
-        corpora: "allDrives",
         key: state.apiKey
       });
       if (pageToken) params.set("pageToken", pageToken);
