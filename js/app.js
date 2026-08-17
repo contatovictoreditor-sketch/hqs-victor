@@ -4,7 +4,7 @@
   // ---------- Config ----------
   // Adicione mais coleções aqui (id da pasta do Drive + nome de exibição).
   const ROOT_FOLDERS = [
-    { id: "1-KhC8KECOzbYfO6v8yTaX6xn0RAGbwR6", name: "X-Men" }
+    { id: "1nBM1Niolm_1avHpch9Ssk0jo7bF9BCC3", name: "HQs" }
   ];
 
   const DRIVE_FILES_URL = "https://www.googleapis.com/drive/v3/files";

@@ -37,7 +37,7 @@ Edite `js/app.js`, no topo do arquivo, o array `ROOT_FOLDERS`:
 
 ```js
 const ROOT_FOLDERS = [
-  { id: "1-KhC8KECOzbYfO6v8yTaX6xn0RAGbwR6", name: "X-Men" },
+  { id: "1nBM1Niolm_1avHpch9Ssk0jo7bF9BCC3", name: "HQs" },
   // { id: "OUTRO_ID_DA_PASTA", name: "Outra coleção" },
 ];
 ```
