@@ -42,6 +42,7 @@
     btnSaveKey: $("#btn-save-key"),
     onboardingError: $("#onboarding-error"),
     continueReading: $("#continue-reading"),
+    searchStatus: $("#search-status"),
     browserGrid: $("#browser-grid"),
     browserEmpty: $("#browser-empty"),
     browserLoading: $("#browser-loading"),
@@ -258,7 +259,7 @@
     return `<svg class="fallback-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M6 2h9l5 5v13a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zm8 1.5V8h4.5"/></svg>`;
   }
 
-  function makeCard(item) {
+  function makeCard(item, pathLabel, onClick) {
     const card = document.createElement("div");
     card.className = "card";
     const isFolder = item.mimeType === FOLDER_MIME;
@@ -292,6 +293,13 @@
     title.textContent = item.name.replace(/\.[a-zA-Z0-9]{2,4}$/, "");
     card.appendChild(title);
 
+    if (pathLabel) {
+      const pathEl = document.createElement("div");
+      pathEl.className = "card-path";
+      pathEl.textContent = pathLabel;
+      card.appendChild(pathEl);
+    }
+
     if (isFolder) {
       const prog = loadProgress(item.id);
       if (prog && prog.total > 1) {
@@ -305,7 +313,7 @@
       }
     }
 
-    card.addEventListener("click", () => onItemClick(item));
+    card.addEventListener("click", () => (onClick ? onClick(item) : onItemClick(item)));
     return card;
   }
 
@@ -417,10 +425,108 @@
     els.browserGrid.appendChild(frag);
   }
 
+  // ---------- Busca global (percorre toda a árvore de pastas) ----------
+  const SEARCH_MAX_FOLDERS = 500;
+  let searchToken = 0;
+  let searchDebounce = null;
+
+  async function searchAll(query, token) {
+    const q = query.toLowerCase();
+    const results = [];
+    const queue = ROOT_FOLDERS.map((r) => ({ id: r.id, name: r.name, path: [] }));
+    let visited = 0;
+    while (queue.length && visited < SEARCH_MAX_FOLDERS) {
+      if (token !== searchToken) return results; // busca cancelada (usuário digitou algo novo)
+      const node = queue.shift();
+      visited++;
+      let children;
+      try {
+        children = await listChildren(node.id);
+      } catch (e) {
+        continue;
+      }
+      for (const item of children) {
+        if (item.name.toLowerCase().includes(q)) {
+          results.push({ item, path: node.path.concat([{ id: node.id, name: node.name }]) });
+        }
+        if (item.mimeType === FOLDER_MIME) {
+          queue.push({ id: item.id, name: item.name, path: node.path.concat([{ id: node.id, name: node.name }]) });
+        }
+      }
+    }
+    return results;
+  }
+
+  function makeSearchCard(result) {
+    const pathLabel = result.path.map((p) => p.name).join(" / ");
+    return makeCard(result.item, pathLabel, (item) => onSearchResultClick(item, result.path));
+  }
+
+  async function onSearchResultClick(item, ancestorPath) {
+    exitSearchMode();
+    if (item.mimeType === FOLDER_MIME) {
+      state.pathStack = [...ancestorPath, { id: item.id, name: item.name }];
+      pushHistory();
+      renderCurrent();
+      return;
+    }
+    const parent = ancestorPath[ancestorPath.length - 1];
+    state.pathStack = [...ancestorPath];
+    pushHistory();
+    updateHeader();
+    if (item.mimeType === PDF_MIME) {
+      openPdfReader(item);
+    } else if (isImage(item.mimeType)) {
+      try {
+        const siblings = await listChildren(parent.id);
+        const { images } = partition(siblings);
+        openImageReader(images, item.id, parent.id, parent.name);
+      } catch (e) {
+        openImageReader([item], item.id, parent.id, parent.name);
+      }
+    }
+  }
+
+  function exitSearchMode() {
+    els.searchInput.value = "";
+    els.searchStatus.classList.add("hidden");
+  }
+
+  async function runSearch(query) {
+    const token = ++searchToken;
+    els.continueReading.classList.add("hidden");
+    els.browserEmpty.classList.add("hidden");
+    els.browserError.classList.add("hidden");
+    els.browserLoading.classList.add("hidden");
+    els.searchStatus.textContent = `Buscando "${query}"...`;
+    els.searchStatus.classList.remove("hidden");
+    els.browserGrid.innerHTML = "";
+
+    const results = await searchAll(query, token);
+    if (token !== searchToken) return; // uma busca mais nova já está em andamento
+
+    if (results.length === 0) {
+      els.searchStatus.textContent = `Nenhum resultado para "${query}".`;
+    } else {
+      els.searchStatus.textContent = `${results.length} resultado${results.length > 1 ? "s" : ""} para "${query}"`;
+      const frag = document.createDocumentFragment();
+      results
+        .sort((a, b) => collator.compare(a.item.name, b.item.name))
+        .forEach((r) => frag.appendChild(makeSearchCard(r)));
+      els.browserGrid.appendChild(frag);
+    }
+  }
+
   els.searchInput.addEventListener("input", () => {
-    const q = els.searchInput.value.trim().toLowerCase();
-    if (!q) { renderGrid(state.currentItems); return; }
-    renderGrid(state.currentItems.filter((i) => i.name.toLowerCase().includes(q)));
+    const q = els.searchInput.value.trim();
+    clearTimeout(searchDebounce);
+    if (!q) {
+      searchToken++; // cancela qualquer busca em andamento
+      els.searchStatus.classList.add("hidden");
+      renderCurrent();
+      return;
+    }
+    searchDebounce = setTimeout(() => runSearch(q), 400);
   });
 
   // ---------- Reader: helper to open a folder directly (from "continue reading") ----------
